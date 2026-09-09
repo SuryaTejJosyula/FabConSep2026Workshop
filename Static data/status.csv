@@ -1,0 +1,3 @@
+﻿"status_code","status_label","description"
+"0","No Data","Sensor or section has no available reading for this capture window"
+"1","Active","Section is active and sensor data is available"

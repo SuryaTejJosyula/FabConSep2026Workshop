@@ -1,0 +1,6 @@
+﻿"speed_state_code","speed_state_label","description","typical_speed_kmh"
+"-1","No Data","No sensor reading available for this period; section may be inactive",""
+"0","Unknown / Below Threshold","Section active but speed cannot be classified (very low volume or sensor anomaly)",""
+"1","Fluid","Traffic flowing freely",">45"
+"2","Dense","Traffic flowing but with notable congestion","25–45"
+"3","Congested","Heavy congestion; significantly reduced speeds","<25"
