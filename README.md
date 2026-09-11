@@ -23,7 +23,7 @@ flowchart LR
     BE --> ACT
 ```
 
-Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancyStream`, `Segment`, `SegmentGeometry`, `SpeedState`, and `Status`. You may use different names, but update your KQL and downstream items consistently.
+Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancyStream`, `SegmentGeometry`, `SpeedState`, and `Status`. You may use different names, but update your KQL and downstream items consistently.
 
 ## Repository contents
 
@@ -31,7 +31,6 @@ Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancySt
 | --- | --- |
 | `Data generators/barcelona_traffic_generator.ipynb` | Generates historical conference-week traffic at five-minute event-time intervals and replays it to Eventstream. |
 | `Data generators/ccib_occupancy_stream_generator.ipynb` | Generates current occupancy for 15 attendee-relevant locations and streams a new batch every five seconds. |
-| `Static data/segment.csv` | Maps the 78 generated traffic segment IDs to eight approximate Barcelona traffic zones. |
 | `Static data/segment_long.csv` | Detailed coordinate points for a larger source catalog of Barcelona road segments. |
 | `Static data/Speed_state.csv` | Traffic speed-state lookup. |
 | `Static data/status.csv` | Traffic sensor-status lookup. |
@@ -43,7 +42,7 @@ Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancySt
 - Python with `pandas`, `numpy`, and `azure-eventhub` for the traffic generator.
 - Python with `pandas` and `azure-eventhub` for the occupancy generator.
 - Two Eventstream custom endpoint connections, one for traffic and one for occupancy, or an agreed design that keeps the two schemas separable.
-- The traffic notebook's three lookup CSVs available in its working directory: `segment.csv`, `Speed_state.csv`, and `status.csv`.
+- The traffic notebook's lookup CSVs available in its working directory: `segment_long.csv`, `Speed_state.csv`, and `status.csv`.
 - A `ccib_occupancy_locations.geojson` input file available in the occupancy notebook's working directory. The notebook expects 15 unique locations with `occupancySignalId`, `name`, `category`, `totalOccupancy`, and polygon geometry. This required input is not currently included in this repository.
 
 Keep connection strings out of source control. Use notebook environment variables or another secret-management mechanism when configuring the Eventstream custom endpoints.
@@ -58,7 +57,7 @@ At the default `SPEED_FACTOR = 12`, each five-minute event-time interval is emit
 
 | Column | Suggested KQL type | Description |
 | --- | --- | --- |
-| `segment_id` | `long` | Identifier of the road segment, from 1 through 78. Join to `Segment.segment_id` for the approximate zone. |
+| `segment_id` | `long` | Identifier of the generated road segment, from 1 through 78. |
 | `timestamp` | `datetime` | Event time at five-minute granularity. Values are ISO 8601 timestamps generated in Barcelona local time with the UTC offset included. |
 | `status_code` | `long` | Sensor availability code. `1` means active and `0` means no reading is available. Join to `Status.status_code`. |
 | `speed_state_code` | `long` | Traffic classification: `-1` no data, `0` unknown/below threshold, `1` fluid, `2` dense, or `3` congested. Join to `SpeedState.speed_state_code`. |
@@ -66,7 +65,7 @@ At the default `SPEED_FACTOR = 12`, each five-minute event-time interval is emit
 | `avg_speed_kmh` | `real` | Synthetic average speed in kilometres per hour. It is normally 46-68 for fluid, 25-45 for dense, and 4-24 for congested traffic; it is null when no speed can be classified. |
 | `incident_flag` | `bool` | Whether the reading is associated with a likely or injected incident. Sensor-outage records are always `false`. |
 
-The notebook also writes `barcelona_traffic_data.csv` locally. That generated file contains all streamed columns plus `zone_approx`, the denormalized zone label used by the notebook for generation and validation. `zone_approx` is deliberately not sent in the Eventstream payload so participants can enrich traffic in Eventhouse using `segment.csv`.
+The notebook also writes `barcelona_traffic_data.csv` locally. That generated file contains all streamed columns plus `zone_approx`, the denormalized zone label used by the notebook for generation and validation. `zone_approx` is deliberately not sent in the Eventstream payload.
 
 ### Traffic behavior to look for
 
@@ -98,15 +97,6 @@ The occupancy payload does not include an event timestamp or location name. Conf
 
 Load the CSV files into Eventhouse as reference tables. Preserve the numeric code columns as `long`; all labels and descriptions can be `string`.
 
-### `segment.csv` to `Segment`
-
-This file contains 78 rows, one for every generated traffic segment.
-
-| Column | Suggested KQL type | Description |
-| --- | --- | --- |
-| `segment_id` | `long` | Unique traffic segment identifier and join key to `TrafficStream.segment_id`. |
-| `zone_approx` | `string` | Approximate zone/corridor grouping. The 78 segments are distributed across eight zones, including `Sant Marti / Ronda Litoral` and `Eixample / Diagonal`. |
-
 ### `segment_long.csv` to `SegmentGeometry`
 
 This file contains 3,228 coordinate rows for 527 road-segment identifiers from a broader source catalog. A segment is represented by multiple ordered component points. The combination of `Tram` and `Tram_Components` is unique.
@@ -119,7 +109,7 @@ This file contains 3,228 coordinate rows for 527 road-segment identifiers from a
 | `Longitud` | `real` | Longitude of the component point in decimal degrees. GeoJSON and map coordinate order is longitude first. |
 | `Latitud` | `real` | Latitude of the component point in decimal degrees. |
 
-`segment_long.csv` is not a strict 78-row dimension for the generator. Although `Tram` values overlap numerically with some generated `segment_id` values, the repository does not establish a complete one-to-one relationship between the files. Validate the intended mapping before joining it to `TrafficStream`; use `segment.csv` as the authoritative enrichment table for the generated traffic IDs.
+`segment_long.csv` is not a strict 78-row dimension for the generator. Although `Tram` values overlap numerically with some generated `segment_id` values, the repository does not establish a complete one-to-one relationship between them. Validate the intended mapping before joining `SegmentGeometry` to `TrafficStream`.
 
 ### `Speed_state.csv` to `SpeedState`
 
