@@ -1,0 +1,201 @@
+{
+  "type": "FeatureCollection",
+  "name": "CCIB attendee occupancy locations",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "ccib-convention-centre",
+        "name": "CCIB - Barcelona International Convention Centre",
+        "category": "conference_venue",
+        "totalOccupancy": 4500
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21650, 41.40795], [2.21805, 41.40795], [2.21805, 41.40890], [2.21650, 41.40890], [2.21650, 41.40795]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "hotel-hilton-diagonal-mar",
+        "name": "Hilton Diagonal Mar Barcelona",
+        "category": "hotel",
+        "totalOccupancy": 860
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21580, 41.40855], [2.21635, 41.40855], [2.21635, 41.40895], [2.21580, 41.40895], [2.21580, 41.40855]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "hotel-ac-barcelona-forum",
+        "name": "AC Hotel Barcelona Forum",
+        "category": "hotel",
+        "totalOccupancy": 720
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21570, 41.41010], [2.21630, 41.41010], [2.21630, 41.41055], [2.21570, 41.41055], [2.21570, 41.41010]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "hotel-barcelona-princess",
+        "name": "Barcelona Princess Hotel",
+        "category": "hotel",
+        "totalOccupancy": 730
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21800, 41.41005], [2.21855, 41.41005], [2.21855, 41.41055], [2.21800, 41.41055], [2.21800, 41.41005]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "hotel-vinci-bit",
+        "name": "Vincci Bit",
+        "category": "hotel",
+        "totalOccupancy": 350
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21170, 41.40875], [2.21220, 41.40875], [2.21220, 41.40910], [2.21170, 41.40910], [2.21170, 41.40875]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "cafe-santa-gloria-diagonal-mar",
+        "name": "Santa Gloria - Diagonal Mar",
+        "category": "cafe",
+        "totalOccupancy": 90
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21625, 41.41020], [2.21650, 41.41020], [2.21650, 41.41040], [2.21625, 41.41040], [2.21625, 41.41020]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "cafe-federal-poblenou",
+        "name": "Federal Cafe Poblenou",
+        "category": "cafe",
+        "totalOccupancy": 110
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.20275, 41.40155], [2.20305, 41.40155], [2.20305, 41.40178], [2.20275, 41.40178], [2.20275, 41.40155]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "spot-parc-del-forum",
+        "name": "Parc del Forum",
+        "category": "interesting_spot",
+        "totalOccupancy": 2200
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.22400, 41.41035], [2.22700, 41.41035], [2.22700, 41.41220], [2.22400, 41.41220], [2.22400, 41.41035]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "spot-diagonal-mar-park",
+        "name": "Parc de Diagonal Mar",
+        "category": "interesting_spot",
+        "totalOccupancy": 900
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21210, 41.40720], [2.21435, 41.40720], [2.21435, 41.40920], [2.21210, 41.40920], [2.21210, 41.40720]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "spot-llevant-beach",
+        "name": "Llevant Beach",
+        "category": "interesting_spot",
+        "totalOccupancy": 1200
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.21770, 41.40120], [2.22120, 41.40215], [2.22075, 41.40300], [2.21730, 41.40205], [2.21770, 41.40120]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "hotel-arts-barcelona",
+        "name": "Hotel Arts Barcelona",
+        "category": "hotel",
+        "totalOccupancy": 950
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.19570, 41.38675], [2.19635, 41.38675], [2.19635, 41.38725], [2.19570, 41.38725], [2.19570, 41.38675]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "hotel-melia-barcelona-sky",
+        "name": "Meliá Barcelona Sky",
+        "category": "hotel",
+        "totalOccupancy": 520
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.20045, 41.40415], [2.20105, 41.40415], [2.20105, 41.40465], [2.20045, 41.40465], [2.20045, 41.40415]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "cafe-de-l-opera",
+        "name": "Cafe de l'Opera",
+        "category": "cafe",
+        "totalOccupancy": 140
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.17320, 41.38000], [2.17350, 41.38000], [2.17350, 41.38022], [2.17320, 41.38022], [2.17320, 41.38000]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "spot-museu-del-disseny",
+        "name": "Museu del Disseny de Barcelona",
+        "category": "interesting_spot",
+        "totalOccupancy": 750
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.18600, 41.40320], [2.18700, 41.40320], [2.18700, 41.40405], [2.18600, 41.40405], [2.18600, 41.40320]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "occupancySignalId": "spot-sagrada-familia",
+        "name": "Basílica de la Sagrada Família",
+        "category": "interesting_spot",
+        "totalOccupancy": 3000
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.17365, 41.40320], [2.17505, 41.40320], [2.17505, 41.40405], [2.17365, 41.40405], [2.17365, 41.40320]]]
+      }
+    }
+  ]
+}
