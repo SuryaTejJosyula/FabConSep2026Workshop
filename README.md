@@ -1,6 +1,14 @@
-# Fabric Conference Barcelona 2026: Real-Time Intelligence Hackathon
+# Barcelona Smart City Pulse: Coordinating Mobility, Safety, and Events in Real Time
 
-Build an end-to-end Microsoft Fabric Real-Time Intelligence solution for live traffic and venue occupancy in Barcelona. During the hackathon, you will generate two event streams, route them through Eventstream, persist and enrich them in Eventhouse, visualize them on a map and Real-Time Dashboard, detect anomalies, create Business Events, and use Activator to respond to changing conditions.
+## The business story
+
+Barcelona is preparing to host the **European Microsoft Fabric Conference 2026** at the Barcelona International Convention Centre (CCIB). For the city, the event is more than a venue operation: thousands of journeys, changing traffic conditions, and shifting occupancy across hotels, cafes, public spaces, and the conference center create a connected urban challenge.
+
+On a busy conference morning, traffic begins to slow along the Ronda Litoral while occupancy near the CCIB rises rapidly. Each signal looks manageable in isolation. Together, they point to a developing problem: attendees are converging on a congested corridor, entrance queues may grow, nearby locations may exceed comfortable capacity, and a single incident could disrupt both the event and the surrounding district. Traditional reports would explain the disruption after it happened. A smart city must recognize the pattern and respond while there is still time to change the outcome.
+
+The **Barcelona Smart City Operations Center** creates a live operational picture from traffic and occupancy data. Microsoft Fabric Eventstream captures signals as they happen, Eventhouse unifies them for analysis, and Real-Time Dashboards and maps reveal where pressure is building. Anomaly detection identifies unusual crowd movement, Business Events turn congestion into actionable signals, and Activator alerts the right teams so they can redirect arrivals, adjust venue staffing, open alternative entrances, or communicate travel guidance before disruption spreads.
+
+Your mission is to build this real-time nervous system for the city. The finished solution should help city and event operators answer three questions continuously: **Where is congestion forming? Which locations are approaching critical occupancy? What action should we take right now?** The same pattern can extend beyond conferences to festivals, sporting events, transport hubs, and emergency response, making this a reusable smart-city capability rather than a one-day dashboard.
 
 > The data is synthetic and intended for demonstration and learning. Capacities, occupancy levels, traffic conditions, and incidents are estimates rather than operational data.
 
