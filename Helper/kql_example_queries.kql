@@ -1,0 +1,93 @@
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Create `traffic_raw` with schema inference from Eventstream, or use this explicit schema:
+// 
+// `segment_id, timestamp, status_code, speed_state_code, vehicle_count, avg_speed_kmh, incident_flag, zone_approx, road_name, start_lat, start_lng, end_lat, end_lng, mid_lat, mid_lng, distance_to_ccib_m`
+//
+// Zone and geometry are already present in each streamed record and are sourced from `segment_long.csv`, so the queries use those fields directly without a separate segment lookup.
+// 
+// - **`speed_state`** ← `speed_state.csv` (`speed_state_code`, `speed_state_label`, `description`, `typical_speed_kmh`)
+// - **`status`** ← `status.csv` (`status_code`, `status_label`, `description`)
+// 
+// The cell below prints 10 ready-to-paste KQL queries covering live snapshots, zone congestion, the CCIB corridor, incident detection, rush-hour comparisons, anomaly detection and sensor health.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// 1. Live snapshot per segment (latest reading, most congested first) //
+traffic_raw
+| summarize arg_max(timestamp, status_code, speed_state_code, avg_speed_kmh, vehicle_count, incident_flag, zone_approx) by segment_id
+| lookup kind=leftouter (speed_state | project speed_state_code, speed_state_label) on speed_state_code
+| project timestamp, segment_id, zone_approx, speed_state_label, avg_speed_kmh, vehicle_count, incident_flag
+| order by speed_state_label desc, avg_speed_kmh asc
+
+// 2. Zone-level congestion summary (last 30 min) //
+traffic_raw
+| where timestamp > ago(30m)
+| summarize avg_speed_kmh    = round(avg(avg_speed_kmh), 1),
+            total_vehicles   = sum(vehicle_count),
+            pct_congested    = round(100.0 * countif(speed_state_code == 3) / count(), 1),
+            incident_rate_pct = round(100.0 * countif(incident_flag) / count(), 1)
+  by zone_approx
+| order by pct_congested desc
+
+// 3. CCIB corridor congestion trend (5-min bins) //
+traffic_raw
+| where zone_approx == "Sant Marti / Ronda Litoral"
+| summarize avg_speed_kmh = avg(avg_speed_kmh), total_vehicles = sum(vehicle_count) by bin(timestamp, 5m)
+| render timechart
+
+// 4. Top 10 most congested segments right now //
+traffic_raw
+| summarize arg_max(timestamp, avg_speed_kmh, vehicle_count, speed_state_code, incident_flag, zone_approx) by segment_id
+| where speed_state_code == 3
+| top 10 by avg_speed_kmh asc
+| project segment_id, zone_approx, avg_speed_kmh, vehicle_count, incident_flag
+
+// 5. Active / recent incidents (last 2 hours) //
+traffic_raw
+| where incident_flag == true and timestamp > ago(2h)
+| summarize incident_start = min(timestamp), incident_end = max(timestamp),
+            min_speed_kmh   = min(avg_speed_kmh), readings = count()
+  by segment_id, zone_approx
+| extend duration_min = datetime_diff('minute', incident_end, incident_start)
+| order by incident_start desc
+
+// 6. Conference rush-hour comparison by zone //
+traffic_raw
+| extend hr = hourofday(timestamp)
+| extend rush_window = case(hr between (7 .. 9), "Morning Arrival",
+                             hr between (12 .. 14), "Lunch",
+                             hr between (18 .. 20), "Evening Departure",
+                             "Off-Peak")
+| summarize avg_speed_kmh = round(avg(avg_speed_kmh), 1),
+            pct_congested = round(100.0 * countif(speed_state_code == 3) / count(), 1)
+  by zone_approx, rush_window
+| order by zone_approx asc, rush_window asc
+
+// 7. Anomaly detection on CCIB vehicle volume //
+traffic_raw
+| where zone_approx == "Sant Marti / Ronda Litoral"
+| make-series total_vehicles = sum(vehicle_count) on timestamp step 5m
+| extend anomalies = series_decompose_anomalies(total_vehicles, 1.5)
+| render anomalychart with (anomalycolumns=anomalies)
+
+// 8. Sensor / data-quality health check (last hour) //
+traffic_raw
+| where timestamp > ago(1h)
+| summarize total = count(), no_data = countif(status_code == 0) by segment_id
+| extend no_data_pct = round(100.0 * no_data / total, 1)
+| where no_data_pct > 0
+| order by no_data_pct desc
+
+// 9. Speed-state distribution across the whole event //
+traffic_raw
+| lookup kind=leftouter (speed_state | project speed_state_code, speed_state_label) on speed_state_code
+| summarize count() by speed_state_label
+| render piechart
+
+// 10. Day-by-day CCIB corridor congestion trend //
+traffic_raw
+| where zone_approx in ("Sant Marti / Ronda Litoral", "Eixample / Diagonal")
+| summarize pct_congested = round(100.0 * countif(speed_state_code == 3) / count(), 1),
+            avg_speed_kmh = round(avg(avg_speed_kmh), 1)
+  by startofday(timestamp)
+| order by timestamp asc
+| render columnchart
