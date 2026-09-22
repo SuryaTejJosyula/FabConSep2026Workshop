@@ -1,0 +1,61 @@
+{
+ "fields": [
+  {
+   "name": "segment_id",
+   "type": "int",
+   "doc": "Segment id for the street"
+  },
+  {
+   "name": "timestamp",
+   "type": "long",
+   "doc": "Timestamp when the event was generated"
+  },
+  {
+   "name": "status_code",
+   "type": "int",
+   "doc": "The status id"
+  },
+  {
+   "name": "speed_state_code",
+   "type": "int",
+   "doc": "The speed state id"
+  },
+  {
+   "name": "vehicle_count",
+   "type": "int",
+   "doc": "Number of vehicles in the segment"
+  },
+  {
+   "name": "avg_speed_kmh",
+   "type": "double",
+   "doc": "Average speed in the segment"
+  },
+  {
+   "name": "incident_flag",
+   "type": "string",
+   "doc": "If there's an incident in the segment"
+  },
+  {
+   "name": "speed_state_label",
+   "type": "string",
+   "doc": "Short description of the speed state"
+  },
+  {
+   "name": "description",
+   "type": "string",
+   "doc": "Long description of the speed state"
+  },
+  {
+   "name": "typical_speed_kmh",
+   "type": "string",
+   "doc": "Average speed in the segment"
+  },
+  {
+   "name": "system_timestamp",
+   "type": "long",
+   "doc": "Timestamp when the data was received and processed by the Eventstream"
+  }
+ ],
+ "type": "record",
+ "name": "Traffic"
+}

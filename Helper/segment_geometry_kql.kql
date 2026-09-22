@@ -1,0 +1,8 @@
+.create-or-alter function with (skipvalidation = "true") segment_geometry() {
+    segment_long
+    | extend location = tostring(pack_array(Longitud,Latitud))
+    | summarize location = make_list(location) by Tram, Descripci_
+    | extend location = parse_json(strcat("[", strcat_array(location, ","), "]"))
+    | project Tram=tostring(Tram), location
+    | extend geometry = bag_pack("type", "LineString", "coordinates", location)
+}
