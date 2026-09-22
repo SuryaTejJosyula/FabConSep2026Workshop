@@ -50,24 +50,93 @@ Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancySt
 | `Helper/segment_geometry_kql.kql` | KQL function that adds the geometry calculations to the segment table. |
 | `Helper/kql_example_queries.kql` | Example queries to be used for the analysis of data. |
 
-## Prerequisites
+## Welcome to the hack
 
-- Access to a Fabric capacity and a workspace where you can create an Eventstream, Eventhouse/KQL Database, Real-Time Dashboard, map, anomaly detector, Business Events, and Activator items.
-- Python with `pandas`, `numpy`, and `azure-eventhub` for the traffic generator.
-- Python with `pandas` and `azure-eventhub` for the occupancy generator.
-- Two Eventstream custom endpoint connections, one for traffic and one for occupancy, or an agreed design that keeps the two schemas separable.
-- A Fabric notebook attached to a default lakehouse. Upload `segment_long.csv`, `speed_state.csv`, `status.csv`, and `occupancy_locations.geojson` from `Static data/` to the lakehouse `Files` area. The notebooks currently read them from `/lakehouse/default/Files/`.
-- The occupancy catalog must retain 15 unique locations with `occupancySignalId`, `name`, `category`, positive `totalOccupancy`, and closed Polygon geometry. The included file satisfies this contract.
+You are the real-time engineering team supporting the Barcelona Smart City Operations Center. The conference opens soon, live signals are becoming available, and the operations team needs a solution that helps them detect pressure before it becomes disruption.
 
-Keep connection strings out of source control. Use notebook environment variables or another secret-management mechanism when configuring the Eventstream custom endpoints.
+The hack is divided into three acts:
 
-## Generated dataset 1: Traffic
+| Act | Focus | Outcome |
+| --- | --- | --- |
+| **Act 1: Ingest and Process Data** | Eventstream, generator notebooks, stream processing, and reference-data enrichment | Trusted traffic and occupancy streams are flowing into Fabric. |
+| **Act 2: Analyze Data** | Eventhouse, shortcuts, functions, materialized views, and KQL investigation | Live and static data produce reusable operational insights. |
+| **Act 3: Visualize Data** | Fabric Map, Real-Time Dashboard, anomaly detection, and optional Operations agent | Operators can see developing problems and decide how to respond. |
 
-The traffic notebook models all 527 distinct `Tram` road segments in `segment_long.csv`, assigned across eight approximate zones, from 27 September through 1 October 2026. It generates one reading per segment every five minutes, including conference arrival, lunch, and departure effects around CCIB, ordinary daily traffic patterns, sensor outages, and seven injected incidents.
+This is not a click-by-click lab. Each act gives your team a mission, constraints, clues, and evidence to produce. You decide how to organize the artifacts, model the data, write the queries, and present the final operational story.
 
-At the default `SPEED_FACTOR = 12`, each five-minute event-time interval is emitted approximately every 25 seconds. Each Eventstream batch contains all 527 segment readings for that interval. Setting `LIVE_SLEEP = False` sends the generated data as a fast backfill.
+### Rules of engagement
 
-### Traffic Eventstream schema
+- Build the smallest end-to-end path first, then improve it.
+- Validate each handoff before moving to the next act.
+- Keep the traffic and occupancy contracts clear and separable.
+- Capture evidence as you work: previews, row counts, query results, maps, dashboards, and alerts.
+- Use the helper files as clues, not as a substitute for understanding the design.
+- A justified alternative design is valid if it meets the success criteria.
+
+## Before the clock starts
+
+Your team needs:
+
+- Access to a Fabric capacity and a workspace where you can create the required Real-Time Intelligence items.
+- Permission to create or attach a lakehouse and run Fabric notebooks.
+- The repository files available locally.
+- A notebook environment capable of using `pandas`, `numpy`, and `azure-eventhub`.
+
+Upload `segment_long.csv`, `speed_state.csv`, `status.csv`, and `occupancy_locations.geojson` from `Static data/` to the default lakehouse `Files` area. The generator notebooks currently read these files from `/lakehouse/default/Files/`.
+
+Keep connection strings out of source control. Configure them only in the notebook session or through an approved secret-management mechanism.
+
+## Act 1: Ingest and Process Data
+
+### The mission
+
+Bring two independent live signals into Microsoft Fabric:
+
+- Traffic conditions across 527 Barcelona road segments.
+- Occupancy at the CCIB and 14 attendee-relevant locations.
+
+The raw numeric codes are useful to systems but not to operators. Process the traffic stream so its state is understandable, then deliver both streams to the analytical layer without losing the fields required later for maps, time-series analysis, and alerts.
+
+### Your challenges
+
+- Design the Eventstream topology for the two different event contracts.
+- Create custom endpoint sources and connect the matching generator notebook to each source.
+- Prove that both feeds arrive continuously and are parsed correctly.
+- Decide how to retain event time for traffic and a usable time axis for occupancy.
+- Enrich traffic with appropriate static reference data.
+- Route traffic and occupancy into separate Eventhouse tables.
+- Handle nulls, type differences, and reference-data mismatches explicitly.
+
+<details>
+<summary><strong>Stuck? Reveal the constraints and clues</strong> — Try solving the challenge with your team before opening this section.</summary>
+
+#### Constraints
+
+- The two source schemas must remain distinguishable.
+- Traffic enrichment must not remove location, zone, or geometry-related fields needed in later acts.
+- Occupancy does not include an event timestamp in its payload.
+- Secrets must not be committed to the repository.
+- The solution must continue to receive new rows while the generators run.
+
+#### Clues
+
+- `speed_state_code` connects the traffic stream to `speed_state.csv`.
+- Eventstream can expose a processing timestamp that may help with the occupancy time axis.
+- The traffic notebook can run as accelerated live playback or as a fast backfill.
+- The occupancy notebook emits one record for every location in each batch.
+- `Helper/sqltransformation.sql` demonstrates one possible enrichment pattern.
+
+</details>
+
+### Evidence to unlock Act 2
+
+- A live preview of both feeds.
+- The expected traffic and occupancy fields with sensible data types.
+- Human-readable traffic state information in the processed flow.
+- New rows in separate traffic and occupancy Eventhouse tables.
+- A short explanation of the timestamp chosen for each dataset.
+
+## Traffic Eventstream schema
 
 | Column | Suggested KQL type | Description |
 | --- | --- | --- |
@@ -87,21 +156,7 @@ At the default `SPEED_FACTOR = 12`, each five-minute event-time interval is emit
 
 The generated dataframe and Eventstream payload have the same 16-column contract shown above. The current notebook does not write a local output CSV.
 
-### Traffic behavior to look for
-
-- `Sant Marti / Ronda Litoral`, the CCIB area, receives the strongest conference load.
-- `Eixample / Diagonal` and ring-road/access zones receive smaller conference effects.
-- Speed state `3` and lower `avg_speed_kmh` values identify congestion.
-- Some records have `status_code = 0`, `speed_state_code = -1`, zero vehicles, and null speed to model an unavailable sensor.
-- `incident_flag = true` provides useful event candidates, while `speed_state_code = 3` is the required basis for congested-segment Business Events.
-
-## Generated dataset 2: Occupancy
-
-The occupancy notebook models the CCIB conference venue plus 14 attendee-relevant hotels, cafes, and interesting spots. Every five seconds it emits one current reading for each of the 15 locations. Normal occupancy follows a category-specific time-of-day curve. The default `MAX_BATCHES = 120` produces a 10-minute run; set it to `None` to run continuously.
-
-Exactly one rotating location receives a synthetic anomaly during each five-minute Barcelona-time window. Even-numbered windows spike close to 96% of capacity and odd-numbered windows drop close to 4%, with a small amount of noise. This gives the anomaly detector a repeatable signal to discover.
-
-### Occupancy Eventstream schema
+## Occupancy Eventstream schema
 
 | Column | Suggested KQL type | Description |
 | --- | --- | --- |
@@ -112,6 +167,63 @@ Exactly one rotating location receives a synthetic anomaly during each five-minu
 | `geometry` | `dynamic` | GeoJSON `Polygon` object centered on the location. The polygon itself is category-shaped for map rendering: conference building, hotel, cafe cup, or interesting-spot magnifying glass. Coordinate order is longitude then latitude. |
 
 The occupancy payload does not include an event timestamp or location name. Configure Eventstream or the Eventhouse ingestion mapping to retain ingestion time, for example as `ingestion_timestamp`, and use that column as the time axis for the Real-Time Dashboard and anomaly detector. The location `name` exists only in the notebook's input catalog and is not streamed by the current implementation.
+
+## Act 2: Analyze Data
+
+### The mission
+
+Turn the incoming events into an analytical foundation for the operations center. Connect the static data through shortcuts, hide repeated logic behind reusable functions, accelerate important questions with materialized views, and investigate what is happening around the city and the CCIB.
+
+Your work should help operators move from a city-level warning to the affected zone, road segment, occupancy location, and time window.
+
+### Your challenges
+
+- Make the lakehouse reference data available in Eventhouse through shortcuts.
+- Build a correct road-segment geometry from the ordered coordinate points.
+- Create reusable functions for enrichment and common calculations.
+- Design materialized views for current-state or frequently used summaries.
+- Investigate congestion, incidents, sensor health, occupancy pressure, and unusual behavior.
+- Select the insights that deserve a place in the operational experience.
+
+<details>
+<summary><strong>Stuck? Reveal the constraints and clues</strong> — Try solving the challenge with your team before opening this section.</summary>
+
+#### Constraints
+
+- `SegmentGeometry` contains multiple rows per segment. A direct join can duplicate traffic events.
+- Static lookup keys and streamed keys must use compatible data types.
+- Analysis must distinguish current state from historical trends.
+- A materialized view should support a real operational question, not exist only to satisfy the challenge.
+- Queries should remain useful while new data is arriving.
+
+#### Clues
+
+- Order segment points by `Tram_Components`.
+- `lookup`, `arg_max()`, time bins, and series functions may be useful.
+- Occupancy percentage makes differently sized locations comparable.
+- High occupancy is not automatically an anomaly; context and history matter.
+- `Helper/segment_geometry_kql.kql` and `Helper/kql_example_queries.kql` contain starting patterns.
+
+</details>
+
+### Questions worth investigating
+
+- Which zones have the greatest concentration of congested readings?
+- Which road segments are currently slowest?
+- Is CCIB-area congestion persistent, recurring, or incident-driven?
+- Which sensors repeatedly return no data?
+- Which locations are nearing capacity?
+- Where do the generated occupancy spikes and drops appear?
+- What combination of traffic and occupancy would justify an operational response?
+
+### Evidence to unlock Act 3
+
+- Static data available to the KQL database through shortcuts.
+- At least one reusable KQL function.
+- At least one useful materialized view.
+- One geometry result per road segment.
+- Three analytical findings that influence the visual design.
+- Proof that the analytical layer continues to update.
 
 ## Static data dictionaries
 
@@ -172,30 +284,71 @@ Other properties (`ID_*`, `*_DESCR`, `NIVELL`, `TERME`, representation, scale, s
 
 This GeoJSON `FeatureCollection` contains the 15 source locations consumed by the occupancy notebook. Each feature has `occupancySignalId`, `name`, `category`, and `totalOccupancy` properties plus a Polygon footprint. The notebook keeps each footprint's center but replaces its coordinates in memory with a category-specific Polygon silhouette before streaming. `name` remains catalog-only and is not included in the five-column Eventstream payload.
 
-## Eventhouse enrichment
+## Act 3: Visualize Data
 
-The traffic stream already includes `zone_approx`, `road_name`, start/end/midpoint coordinates, and distance to CCIB derived from `segment_long.csv`. Add readable state labels with the two compact lookup tables:
+### The mission
 
-```kusto
-TrafficStream
-| lookup kind=leftouter (SpeedState) on speed_state_code
-| lookup kind=leftouter (Status) on status_code
-```
+Build the live operational experience. The result should help a controller notice a problem, understand its location and severity, and decide what action to take.
 
-The result should retain the original measures and geometry fields and add `speed_state_label`, the speed-state description/band, `status_label`, and the status description. Avoid projecting two columns with the same name; rename the two lookup descriptions when materializing an enriched table. Use `SegmentGeometry` only when the full ordered road line is required, and first aggregate its component rows by `Tram` to avoid multiplying stream records.
+Use Fabric Map, a Real-Time Dashboard, and anomaly detection to tell one connected operational story. An Operations agent is an optional challenge after the core experience works.
 
-## Suggested hackathon build order
+### Your challenges
 
-1. Create traffic and occupancy custom endpoint sources in Eventstream.
-2. Configure each notebook with its matching endpoint and start both generators.
-3. Confirm that Eventstream previews show correctly parsed events for both schemas.
-4. Add Eventhouse destinations and verify that `TrafficStream` and `OccupancyStream` continue to receive rows.
-5. Ingest the static CSVs into reference tables. Enrich traffic with speed-state and status labels; retain `SegmentGeometry` for detailed road-line construction if needed.
-6. Build a Real-Time Dashboard with live traffic data.
-7. Build a Barcelona map that updates from live traffic and occupancy data. Use occupancy `geometry` directly and the streamed traffic midpoint or start/end coordinates.
-8. Create an anomaly detector over occupancy or traffic volume and configure alerts/actions in Activator.
-9. Create Business Events for records where `speed_state_code == 3`, including at least segment, event time, speed, vehicle count, incident indicator, and enriched zone.
-10. Run an end-to-end test and capture evidence for every success criterion.
+- Create a Fabric Map showing live traffic and occupancy in the Barcelona region.
+- Create a Real-Time Dashboard that answers the key business questions.
+- Detect one of the generated occupancy or traffic anomalies.
+- Configure an alert or action for a condition that deserves attention.
+- Present the journey from incoming signal to operational response.
+- Optionally create an Operations agent for natural-language investigation.
+
+<details>
+<summary><strong>Stuck? Reveal the constraints and clues</strong> — Try solving the challenge with your team before opening this section.</summary>
+
+#### Constraints
+
+- Every visual must support a decision or investigation.
+- Current-state visuals must not accidentally mix old and new readings.
+- Traffic and occupancy colors, labels, and severity meanings should be consistent.
+- Alerts must include enough context for someone to act.
+- The optional agent must be grounded in trusted functions, views, or tables and its answers must be validated.
+
+#### Clues
+
+- Traffic can be mapped with midpoint coordinates or reconstructed road lines.
+- Occupancy already contains dynamic GeoJSON polygons.
+- Current-state views are useful map sources.
+- Strong operational dashboards combine KPIs, trends, ranked problem areas, and details.
+- The occupancy generator rotates a deliberate spike or drop every five-minute window.
+
+</details>
+
+### Minimum operational experience
+
+- A Barcelona map with live traffic and occupancy context.
+- Current congestion and occupancy KPIs.
+- A trend focused on the CCIB area or another justified operational zone.
+- A ranked list of locations or road segments requiring attention.
+- A visible anomaly and an associated alert or action.
+
+### Optional missions
+
+- Add Barcelona boundaries as contextual map data.
+- Create a combined pressure indicator using nearby traffic and occupancy.
+- Create Business Events for congested segments.
+- Add an Operations agent and test it with realistic operator questions.
+- Explain how the design would scale to more sources, a larger city, or stricter latency requirements.
+
+### Final demonstration
+
+You have five minutes. Show:
+
+1. The two generators producing events.
+2. A live event becoming an Eventhouse row.
+3. An analysis result that reveals an operational condition.
+4. The condition appearing on the map or dashboard.
+5. An anomaly, alert, Business Event, or recommended response.
+
+Tell one convincing story rather than presenting every artifact.
 
 ## Success criteria
 
