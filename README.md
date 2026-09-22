@@ -18,6 +18,7 @@ Your mission is to build this real-time nervous system for the city. The finishe
 flowchart LR
     T[Traffic generator notebook] --> ES[Fabric Eventstream]
     O[Occupancy generator notebook] --> ES
+    P[Reference traffic state table] --> ES
     ES --> TS[TrafficStream table]
     ES --> OS[OccupancyStream table]
     S[Static CSV reference data] --> EH[Eventhouse / KQL database]
@@ -44,6 +45,10 @@ Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancySt
 | `Static data/status.csv` | Traffic sensor-status lookup. |
 | `Static data/barcelona.geojson` | Barcelona basic statistical area boundaries for map context. |
 | `Static data/occupancy_locations.geojson` | Source catalog of the 15 CCIB-area occupancy locations used by the occupancy generator. |
+| `Helper/sqltransformation.sql` | Example SQL code for the Eventstream enrichment of data and multiple destinations. |
+| `Helper/traffic_schema.json` | Schema of the events after been enriched for the Business Events. |
+| `Helper/segment_geometry_kql.kql` | KQL function that adds the geometry calculations to the segment table. |
+| `Helper/kql_example_queries.kql` | Example queries to be used for the analysis of data. |
 
 ## Prerequisites
 
