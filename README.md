@@ -186,7 +186,7 @@ The result should retain the original measures and geometry fields and add `spee
 3. Confirm that Eventstream previews show correctly parsed events for both schemas.
 4. Add Eventhouse destinations and verify that `TrafficStream` and `OccupancyStream` continue to receive rows.
 5. Ingest the static CSVs into reference tables. Enrich traffic with speed-state and status labels; retain `SegmentGeometry` for detailed road-line construction if needed.
-6. Build a Real-Time Dashboard for speed, vehicle count, congestion, incidents, occupancy, and occupancy percentage.
+6. Build a Real-Time Dashboard with live traffic data.
 7. Build a Barcelona map that updates from live traffic and occupancy data. Use occupancy `geometry` directly and the streamed traffic midpoint or start/end coordinates.
 8. Create an anomaly detector over occupancy or traffic volume and configure alerts/actions in Activator.
 9. Create Business Events for records where `speed_state_code == 3`, including at least segment, event time, speed, vehicle count, incident indicator, and enriched zone.
@@ -202,12 +202,3 @@ The hackathon solution is complete when all of the following are demonstrated:
 - [ ] **A map shows live traffic and occupancy updates in the Barcelona region.** Traffic condition and occupancy/capacity changes are visible and refresh while events arrive.
 - [ ] **An anomaly detector is created and alerts are configured.** The detector identifies the generated spike/drop behavior or traffic-volume anomalies, and Activator has an enabled alert/action for detected anomalies.
 - [ ] **Business Events are created for congested segments.** A Business Event is emitted when `speed_state_code == 3`, with enough segment and enriched location context to investigate the congestion.
-
-## Validation tips
-
-- Check both Eventstream input and output event counts; a source preview alone does not prove Eventhouse ingestion.
-- Verify enrichment with `countif(isempty(speed_state_label))` and `countif(isempty(status_label))`; `zone_approx` is already populated by the traffic generator.
-- For occupancy anomalies, chart occupancy percentage by `occupancySignalId` using ingestion time and a five-second or one-minute bin.
-- For live traffic maps, use `arg_max(timestamp, *) by segment_id` so each segment displays only its latest state.
-- Confirm an alert by observing a detector result and its corresponding Activator run/action, not only by saving the rule.
-- Confirm Business Events with at least one known congested record from the traffic stream.
