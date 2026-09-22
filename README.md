@@ -102,7 +102,6 @@ The raw numeric codes are useful to systems but not to operators. Process the tr
 - Design the Eventstream topology for the two different event contracts.
 - Create custom endpoint sources and connect the matching generator notebook to each source.
 - Prove that both feeds arrive continuously and are parsed correctly.
-- Decide how to retain event time for traffic and a usable time axis for occupancy.
 - Enrich traffic with appropriate static reference data.
 - Route traffic and occupancy into separate Eventhouse tables.
 - Handle nulls, type differences, and reference-data mismatches explicitly.
@@ -121,9 +120,8 @@ The raw numeric codes are useful to systems but not to operators. Process the tr
 #### Clues
 
 - `speed_state_code` connects the traffic stream to `speed_state.csv`.
-- Eventstream can expose a processing timestamp that may help with the occupancy time axis.
-- The traffic notebook can run as accelerated live playback or as a fast backfill.
-- The occupancy notebook emits one record for every location in each batch.
+- Eventstream can expose a processing timestamp via ManageFields transformation that may help with the occupancy time axis (OR) Try to use direct ingestion for Occupanystream and add timestamp in Eventhouse.
+- You can enrich the data with either low/no code transformation or using SQL code transformation in Eventstream.
 - `Helper/sqltransformation.sql` demonstrates one possible enrichment pattern.
 
 </details>
@@ -182,7 +180,7 @@ Your work should help operators move from a city-level warning to the affected z
 - Build a correct road-segment geometry from the ordered coordinate points.
 - Create reusable functions for enrichment and common calculations.
 - Design materialized views for current-state or frequently used summaries.
-- Investigate congestion, incidents, sensor health, occupancy pressure, and unusual behavior.
+- Investigate congestion, incidents, occupancy pressure, and unusual behavior.
 - Select the insights that deserve a place in the operational experience.
 
 <details>
@@ -216,15 +214,6 @@ Your work should help operators move from a city-level warning to the affected z
 - Where do the generated occupancy spikes and drops appear?
 - What combination of traffic and occupancy would justify an operational response?
 
-### Evidence to unlock Act 3
-
-- Static data available to the KQL database through shortcuts.
-- At least one reusable KQL function.
-- At least one useful materialized view.
-- One geometry result per road segment.
-- Three analytical findings that influence the visual design.
-- Proof that the analytical layer continues to update.
-
 ## Static data dictionaries
 
 Load the CSV files into Eventhouse as reference tables. Preserve the numeric code columns as `long`; all labels and descriptions can be `string`.
@@ -238,8 +227,8 @@ This file contains 3,228 coordinate rows for 527 road-segment identifiers from a
 | `Tram` | `long` | Source road-section identifier. There are 527 distinct values in the file, ranging from 1 to 534. |
 | `Tram_Components` | `long` | Component/point sequence within a `Tram`. Order by this field when constructing a line for a road section. |
 | `Descripci_` | `string` | Human-readable Catalan route description, usually including the direction or endpoints. |
-| `Longitud` | `real` | Longitude of the component point in decimal degrees. GeoJSON and map coordinate order is longitude first. |
-| `Latitud` | `real` | Latitude of the component point in decimal degrees. |
+| `Longitude` | `real` | Longitude of the component point in decimal degrees. GeoJSON and map coordinate order is longitude first. |
+| `Latitude` | `real` | Latitude of the component point in decimal degrees. |
 
 The traffic generator groups this file by `Tram` and copies that value directly to `TrafficStream.segment_id`. The relationship is therefore exact at the segment level. Because `SegmentGeometry` contains multiple component rows per segment, joining it directly to the stream is one-to-many and will duplicate traffic readings; summarize it to one row per `Tram` first when a segment dimension is needed.
 
@@ -262,27 +251,20 @@ The traffic generator groups this file by `Tram` and copies that value directly 
 
 ### `barcelona.geojson` map context
 
-This optional static file is a GeoJSON `FeatureCollection` containing 233 Barcelona basic statistical area features: 231 polygons and 2 multipolygons. It does not have a confirmed join key to the generated traffic or occupancy datasets, so use it as a contextual boundary layer rather than as required stream enrichment.
-
-The file contains extensive cartographic metadata. The most useful properties for this hackathon are:
-
-| Property | Description |
-| --- | --- |
-| `AEB` / `LITERAL` | Unique basic statistical area code in this file. |
-| `DISTRICTE` | Barcelona district code. |
-| `BARRI` | Neighborhood code. |
-| `ZUA` | Urban-area grouping code. |
-| `TIPUS_UA` | Administrative unit type; values identify AEB features. |
-| `PERIMETRE` | Polygon perimeter from the source dataset. |
-| `AREA` | Polygon area from the source dataset. |
-| `NDESCR_CA`, `NDESCR_ES`, `NDESCR_EN` | Feature descriptions in Catalan, Spanish, and English. |
-| `geometry` | GeoJSON `Polygon` or `MultiPolygon` coordinates for the map layer. |
-
-Other properties (`ID_*`, `*_DESCR`, `NIVELL`, `TERME`, representation, scale, style, and color fields) are source-system classification and cartographic metadata. Several web/document/name fields are null throughout this extract.
+This static file is a GeoJSON `FeatureCollection` containing 233 Barcelona basic statistical area features: 231 polygons and 2 multipolygons. It does not have a confirmed join key to the generated traffic or occupancy datasets, so use it as a contextual boundary layer rather than as required stream enrichment.
 
 ### `occupancy_locations.geojson` source catalog
 
 This GeoJSON `FeatureCollection` contains the 15 source locations consumed by the occupancy notebook. Each feature has `occupancySignalId`, `name`, `category`, and `totalOccupancy` properties plus a Polygon footprint. The notebook keeps each footprint's center but replaces its coordinates in memory with a category-specific Polygon silhouette before streaming. `name` remains catalog-only and is not included in the five-column Eventstream payload.
+
+### Evidence to unlock Act 3
+
+- Static data available to the KQL database through shortcuts.
+- At least one reusable KQL function.
+- At least one useful materialized view.
+- One geometry result per road segment.
+- Analytical findings that influence the visual design.
+- Proof that the analytical layer continues to update.
 
 ## Act 3: Visualize Data
 
@@ -294,10 +276,10 @@ Use Fabric Map, a Real-Time Dashboard, and anomaly detection to tell one connect
 
 ### Your challenges
 
-- Create a Fabric Map showing live traffic and occupancy in the Barcelona region.
+- Create a Fabric Map showing live traffic and occupancy in the Barcelona region with data driven styling that shows different traffic states on the map.
 - Create a Real-Time Dashboard that answers the key business questions.
 - Detect one of the generated occupancy or traffic anomalies.
-- Configure an alert or action for a condition that deserves attention.
+- Configure an alert or action for a condition that deserves attention. Showing a working alert in Teams or Outlook is optional. 
 - Present the journey from incoming signal to operational response.
 - Optionally create an Operations agent for natural-language investigation.
 
@@ -310,21 +292,21 @@ Use Fabric Map, a Real-Time Dashboard, and anomaly detection to tell one connect
 - Current-state visuals must not accidentally mix old and new readings.
 - Traffic and occupancy colors, labels, and severity meanings should be consistent.
 - Alerts must include enough context for someone to act.
-- The optional agent must be grounded in trusted functions, views, or tables and its answers must be validated.
+- The optional Operations agent must be grounded in trusted functions, views, or tables and its answers must be validated.
 
 #### Clues
 
-- Traffic can be mapped with midpoint coordinates or reconstructed road lines.
+- Traffic can be enriched with segmentgeometry function in Eventhouse to represent in Map.
 - Occupancy already contains dynamic GeoJSON polygons.
 - Current-state views are useful map sources.
-- Strong operational dashboards combine KPIs, trends, ranked problem areas, and details.
+- Strong operational dashboards combine KPIs, trends, ranked problem areas, and/or any other details.
 - The occupancy generator rotates a deliberate spike or drop every five-minute window.
 
 </details>
 
 ### Minimum operational experience
 
-- A Barcelona map with live traffic and occupancy context.
+- A Barcelona map with Barcelona boundaries and live traffic and occupancy context.
 - Current congestion and occupancy KPIs.
 - A trend focused on the CCIB area or another justified operational zone.
 - A ranked list of locations or road segments requiring attention.
@@ -332,11 +314,10 @@ Use Fabric Map, a Real-Time Dashboard, and anomaly detection to tell one connect
 
 ### Optional missions
 
-- Add Barcelona boundaries as contextual map data.
 - Create a combined pressure indicator using nearby traffic and occupancy.
 - Create Business Events for congested segments.
 - Add an Operations agent and test it with realistic operator questions.
-- Explain how the design would scale to more sources, a larger city, or stricter latency requirements.
+- Think how the design would scale to more sources, a larger city, or stricter latency requirements.
 
 ### Final demonstration
 
