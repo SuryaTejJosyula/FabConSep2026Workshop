@@ -37,12 +37,13 @@ Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancySt
 
 | Path | Purpose |
 | --- | --- |
-| `Data generators/barcelona_traffic_generator.ipynb` | Generates historical conference-week traffic at five-minute event-time intervals and replays it to Eventstream. |
-| `Data generators/ccib_occupancy_stream_generator.ipynb` | Generates current occupancy for 15 attendee-relevant locations and streams a new batch every five seconds. |
+| `Data generators/barcelona_traffic_generator.ipynb` | Generates conference-week traffic for all 527 road segments in `segment_long.csv` at five-minute event-time intervals and replays it to Eventstream. |
+| `Data generators/occupancy_stream_generator.ipynb` | Generates current occupancy for 15 attendee-relevant locations and streams a new batch every five seconds. By default it stops after 120 batches (10 minutes). |
 | `Static data/segment_long.csv` | Detailed coordinate points for a larger source catalog of Barcelona road segments. |
-| `Static data/Speed_state.csv` | Traffic speed-state lookup. |
+| `Static data/speed_state.csv` | Traffic speed-state lookup. |
 | `Static data/status.csv` | Traffic sensor-status lookup. |
-| `Static data/Barcelona.geojson` | Barcelona basic statistical area boundaries for map context. |
+| `Static data/barcelona.geojson` | Barcelona basic statistical area boundaries for map context. |
+| `Static data/occupancy_locations.geojson` | Source catalog of the 15 CCIB-area occupancy locations used by the occupancy generator. |
 
 ## Prerequisites
 
@@ -50,30 +51,36 @@ Suggested Eventhouse table names in this guide are `TrafficStream`, `OccupancySt
 - Python with `pandas`, `numpy`, and `azure-eventhub` for the traffic generator.
 - Python with `pandas` and `azure-eventhub` for the occupancy generator.
 - Two Eventstream custom endpoint connections, one for traffic and one for occupancy, or an agreed design that keeps the two schemas separable.
-- The traffic notebook's lookup CSVs available in its working directory: `segment_long.csv`, `Speed_state.csv`, and `status.csv`.
-- A `ccib_occupancy_locations.geojson` input file available in the occupancy notebook's working directory. The notebook expects 15 unique locations with `occupancySignalId`, `name`, `category`, `totalOccupancy`, and polygon geometry. This required input is not currently included in this repository.
+- A Fabric notebook attached to a default lakehouse. Upload `segment_long.csv`, `speed_state.csv`, `status.csv`, and `occupancy_locations.geojson` from `Static data/` to the lakehouse `Files` area. The notebooks currently read them from `/lakehouse/default/Files/`.
+- The occupancy catalog must retain 15 unique locations with `occupancySignalId`, `name`, `category`, positive `totalOccupancy`, and closed Polygon geometry. The included file satisfies this contract.
 
 Keep connection strings out of source control. Use notebook environment variables or another secret-management mechanism when configuring the Eventstream custom endpoints.
 
 ## Generated dataset 1: Traffic
 
-The traffic notebook models 78 road segments across eight zones from 27 September through 1 October 2026. It generates one reading per segment every five minutes, including conference arrival, lunch, and departure effects around CCIB, ordinary daily traffic patterns, sensor outages, and injected incidents.
+The traffic notebook models all 527 distinct `Tram` road segments in `segment_long.csv`, assigned across eight approximate zones, from 27 September through 1 October 2026. It generates one reading per segment every five minutes, including conference arrival, lunch, and departure effects around CCIB, ordinary daily traffic patterns, sensor outages, and seven injected incidents.
 
-At the default `SPEED_FACTOR = 12`, each five-minute event-time interval is emitted approximately every 25 seconds. Each Eventstream batch contains all 78 segment readings for that interval. Setting `LIVE_SLEEP = False` sends the generated data as a fast backfill.
+At the default `SPEED_FACTOR = 12`, each five-minute event-time interval is emitted approximately every 25 seconds. Each Eventstream batch contains all 527 segment readings for that interval. Setting `LIVE_SLEEP = False` sends the generated data as a fast backfill.
 
 ### Traffic Eventstream schema
 
 | Column | Suggested KQL type | Description |
 | --- | --- | --- |
-| `segment_id` | `long` | Identifier of the generated road segment, from 1 through 78. |
+| `segment_id` | `long` | Authoritative road-section identifier copied from `segment_long.csv.Tram`. The 527 distinct values range from 1 through 534 and are not required to be contiguous. |
 | `timestamp` | `datetime` | Event time at five-minute granularity. Values are ISO 8601 timestamps generated in Barcelona local time with the UTC offset included. |
 | `status_code` | `long` | Sensor availability code. `1` means active and `0` means no reading is available. Join to `Status.status_code`. |
 | `speed_state_code` | `long` | Traffic classification: `-1` no data, `0` unknown/below threshold, `1` fluid, `2` dense, or `3` congested. Join to `SpeedState.speed_state_code`. |
 | `vehicle_count` | `long` | Synthetic number of vehicles observed in the segment's five-minute window. It is derived from zone capacity, time of day, conference load, and random variation. It is `0` during a simulated sensor outage. |
 | `avg_speed_kmh` | `real` | Synthetic average speed in kilometres per hour. It is normally 46-68 for fluid, 25-45 for dense, and 4-24 for congested traffic; it is null when no speed can be classified. |
 | `incident_flag` | `bool` | Whether the reading is associated with a likely or injected incident. Sensor-outage records are always `false`. |
+| `zone_approx` | `string` | One of eight generated zone labels, assigned from segment geometry, distance to CCIB, and the road description. |
+| `road_name` | `string` | Catalan road description copied from the first ordered component's `Descripci_`. |
+| `start_lat`, `start_lng` | `real` | Coordinates of the first ordered component point. |
+| `end_lat`, `end_lng` | `real` | Coordinates of the last ordered component point. |
+| `mid_lat`, `mid_lng` | `real` | Arithmetic mean of all component-point coordinates, used as the segment midpoint. |
+| `distance_to_ccib_m` | `real` | Haversine distance from the generated midpoint to CCIB, in metres. |
 
-The notebook also writes `barcelona_traffic_data.csv` locally. That generated file contains all streamed columns plus `zone_approx`, the denormalized zone label used by the notebook for generation and validation. `zone_approx` is deliberately not sent in the Eventstream payload.
+The generated dataframe and Eventstream payload have the same 16-column contract shown above. The current notebook does not write a local output CSV.
 
 ### Traffic behavior to look for
 
@@ -85,7 +92,7 @@ The notebook also writes `barcelona_traffic_data.csv` locally. That generated fi
 
 ## Generated dataset 2: Occupancy
 
-The occupancy notebook models the CCIB conference venue plus 14 attendee-relevant hotels, cafes, and interesting spots. Every five seconds it emits one current reading for each of the 15 locations. Normal occupancy follows a category-specific time-of-day curve.
+The occupancy notebook models the CCIB conference venue plus 14 attendee-relevant hotels, cafes, and interesting spots. Every five seconds it emits one current reading for each of the 15 locations. Normal occupancy follows a category-specific time-of-day curve. The default `MAX_BATCHES = 120` produces a 10-minute run; set it to `None` to run continuously.
 
 Exactly one rotating location receives a synthetic anomaly during each five-minute Barcelona-time window. Even-numbered windows spike close to 96% of capacity and odd-numbered windows drop close to 4%, with a small amount of noise. This gives the anomaly detector a repeatable signal to discover.
 
@@ -117,9 +124,9 @@ This file contains 3,228 coordinate rows for 527 road-segment identifiers from a
 | `Longitud` | `real` | Longitude of the component point in decimal degrees. GeoJSON and map coordinate order is longitude first. |
 | `Latitud` | `real` | Latitude of the component point in decimal degrees. |
 
-`segment_long.csv` is not a strict 78-row dimension for the generator. Although `Tram` values overlap numerically with some generated `segment_id` values, the repository does not establish a complete one-to-one relationship between them. Validate the intended mapping before joining `SegmentGeometry` to `TrafficStream`.
+The traffic generator groups this file by `Tram` and copies that value directly to `TrafficStream.segment_id`. The relationship is therefore exact at the segment level. Because `SegmentGeometry` contains multiple component rows per segment, joining it directly to the stream is one-to-many and will duplicate traffic readings; summarize it to one row per `Tram` first when a segment dimension is needed.
 
-### `Speed_state.csv` to `SpeedState`
+### `speed_state.csv` to `SpeedState`
 
 | Column | Suggested KQL type | Description |
 | --- | --- | --- |
@@ -136,7 +143,7 @@ This file contains 3,228 coordinate rows for 527 road-segment identifiers from a
 | `status_label` | `string` | Display label: `No Data` for `0` and `Active` for `1`. |
 | `description` | `string` | Business explanation of the sensor/section availability state. |
 
-### `Barcelona.geojson` map context
+### `barcelona.geojson` map context
 
 This optional static file is a GeoJSON `FeatureCollection` containing 233 Barcelona basic statistical area features: 231 polygons and 2 multipolygons. It does not have a confirmed join key to the generated traffic or occupancy datasets, so use it as a contextual boundary layer rather than as required stream enrichment.
 
@@ -156,18 +163,21 @@ The file contains extensive cartographic metadata. The most useful properties fo
 
 Other properties (`ID_*`, `*_DESCR`, `NIVELL`, `TERME`, representation, scale, style, and color fields) are source-system classification and cartographic metadata. Several web/document/name fields are null throughout this extract.
 
+### `occupancy_locations.geojson` source catalog
+
+This GeoJSON `FeatureCollection` contains the 15 source locations consumed by the occupancy notebook. Each feature has `occupancySignalId`, `name`, `category`, and `totalOccupancy` properties plus a Polygon footprint. The notebook keeps each footprint's center but replaces its coordinates in memory with a category-specific Polygon silhouette before streaming. `name` remains catalog-only and is not included in the five-column Eventstream payload.
+
 ## Eventhouse enrichment
 
-Create an enriched traffic query or update policy that joins the stream to the three compact lookup tables. The core relationship is:
+The traffic stream already includes `zone_approx`, `road_name`, start/end/midpoint coordinates, and distance to CCIB derived from `segment_long.csv`. Add readable state labels with the two compact lookup tables:
 
 ```kusto
 TrafficStream
-| lookup kind=leftouter (Segment) on segment_id
 | lookup kind=leftouter (SpeedState) on speed_state_code
 | lookup kind=leftouter (Status) on status_code
 ```
 
-The result should retain the original measures and add `zone_approx`, `speed_state_label`, the speed-state description/band, `status_label`, and the status description. Avoid projecting two columns with the same name; rename the two lookup descriptions when materializing an enriched table.
+The result should retain the original measures and geometry fields and add `speed_state_label`, the speed-state description/band, `status_label`, and the status description. Avoid projecting two columns with the same name; rename the two lookup descriptions when materializing an enriched table. Use `SegmentGeometry` only when the full ordered road line is required, and first aggregate its component rows by `Tram` to avoid multiplying stream records.
 
 ## Suggested hackathon build order
 
@@ -175,9 +185,9 @@ The result should retain the original measures and add `zone_approx`, `speed_sta
 2. Configure each notebook with its matching endpoint and start both generators.
 3. Confirm that Eventstream previews show correctly parsed events for both schemas.
 4. Add Eventhouse destinations and verify that `TrafficStream` and `OccupancyStream` continue to receive rows.
-5. Ingest the static CSVs into lookup tables and enrich traffic by the documented keys.
-6. Build a Real-Time Dashboard for speed, vehicle count, congestion, incidents, occupancy, and occupancy percentage.
-7. Build a Barcelona map that updates from live traffic and occupancy data. Use occupancy `geometry` directly and use validated traffic coordinates/geometry for road segments.
+5. Ingest the static CSVs into reference tables. Enrich traffic with speed-state and status labels; retain `SegmentGeometry` for detailed road-line construction if needed.
+6. Build a Real-Time Dashboard with live traffic data.
+7. Build a Barcelona map that updates from live traffic and occupancy data. Use occupancy `geometry` directly and the streamed traffic midpoint or start/end coordinates.
 8. Create an anomaly detector over occupancy or traffic volume and configure alerts/actions in Activator.
 9. Create Business Events for records where `speed_state_code == 3`, including at least segment, event time, speed, vehicle count, incident indicator, and enriched zone.
 10. Run an end-to-end test and capture evidence for every success criterion.
@@ -188,16 +198,7 @@ The hackathon solution is complete when all of the following are demonstrated:
 
 - [ ] **Traffic and occupancy events are flowing into Eventstream.** Both live sources show incoming, correctly parsed events with their expected schemas.
 - [ ] **Traffic and occupancy data also flow into Eventhouse.** New rows appear while the notebooks are running, and timestamps/ingestion times support live time-series queries.
-- [ ] **Traffic data is enriched with static data in Eventhouse.** A query or materialized table joins traffic to segment, speed-state, and status reference data and returns readable zone and state labels.
+- [ ] **Traffic data is enriched with static data in Eventhouse.** A query or materialized table joins traffic to speed-state and status reference data and returns readable state labels while retaining the streamed zone and geometry fields.
 - [ ] **A map shows live traffic and occupancy updates in the Barcelona region.** Traffic condition and occupancy/capacity changes are visible and refresh while events arrive.
 - [ ] **An anomaly detector is created and alerts are configured.** The detector identifies the generated spike/drop behavior or traffic-volume anomalies, and Activator has an enabled alert/action for detected anomalies.
 - [ ] **Business Events are created for congested segments.** A Business Event is emitted when `speed_state_code == 3`, with enough segment and enriched location context to investigate the congestion.
-
-## Validation tips
-
-- Check both Eventstream input and output event counts; a source preview alone does not prove Eventhouse ingestion.
-- Verify enrichment with `countif(isempty(zone_approx))` and investigate unmatched segment IDs.
-- For occupancy anomalies, chart occupancy percentage by `occupancySignalId` using ingestion time and a five-second or one-minute bin.
-- For live traffic maps, use `arg_max(timestamp, *) by segment_id` so each segment displays only its latest state.
-- Confirm an alert by observing a detector result and its corresponding Activator run/action, not only by saving the rule.
-- Confirm Business Events with at least one known congested record from the traffic stream.
